@@ -192,6 +192,10 @@ func MakeHTTPRequest(url, method string, headers http.Header, payload []byte) ([
 	for k, v := range headers {
 		req.Header.Set(k, v[0])
 	}
+
+	if len(headers.Get("Host")) > 0 {
+		req.Host = headers.Get("Host")
+	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36 OPR/89.0.4447.6")
 
 	response, err := client.Do(req)
