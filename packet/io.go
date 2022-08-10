@@ -2,6 +2,7 @@ package packet
 
 import (
 	"bytes"
+	"crypto/tls"
 	"ffw/crypto"
 	"fmt"
 	"io"
@@ -105,13 +106,13 @@ func ForwardHTTP(dst *ChannelTCPData, message []byte) (written int, err error) {
 }
 
 func CreateTunnel(url string, headers http.Header) (err error) {
-	_, _, err = makeHTTPRequest(url, http.MethodPost, headers, nil)
+	_, _, err = MakeHTTPRequest(url, http.MethodPost, headers, nil)
 	return
 }
 
 func CopyTunnel(url string, headers http.Header, conn net.Conn, key []byte) {
 	for {
-		message, statusCode, err := makeHTTPRequest(url, http.MethodGet, headers, nil)
+		message, statusCode, err := MakeHTTPRequest(url, http.MethodGet, headers, nil)
 		if err != nil {
 			log.Printf("recv data: %v", err)
 			break
@@ -152,7 +153,7 @@ func ForwardTunnel(url string, headers http.Header, conn net.Conn, key []byte) (
 				break
 			}
 
-			_, _, er = makeHTTPRequest(url, http.MethodPut, headers, payload)
+			_, _, er = MakeHTTPRequest(url, http.MethodPut, headers, payload)
 			if err != nil {
 				err = fmt.Errorf("send data: %v", er)
 				break
@@ -168,16 +169,20 @@ func ForwardTunnel(url string, headers http.Header, conn net.Conn, key []byte) (
 		}
 	}
 
-	_, _, err = makeHTTPRequest(url, http.MethodDelete, headers, nil)
+	_, _, err = MakeHTTPRequest(url, http.MethodDelete, headers, nil)
 	if err != nil {
 		err = fmt.Errorf("close data: %v", err)
 	}
 	return
 }
 
-func makeHTTPRequest(url, method string, headers http.Header, payload []byte) ([]byte, int, error) {
+func MakeHTTPRequest(url, method string, headers http.Header, payload []byte) ([]byte, int, error) {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
 	client := &http.Client{
-		Timeout: time.Second * 15,
+		Timeout:   time.Second * 15,
+		Transport: tr,
 	}
 
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(payload))
@@ -187,6 +192,7 @@ func makeHTTPRequest(url, method string, headers http.Header, payload []byte) ([
 	for k, v := range headers {
 		req.Header.Set(k, v[0])
 	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36 OPR/89.0.4447.6")
 
 	response, err := client.Do(req)
 	if err != nil {

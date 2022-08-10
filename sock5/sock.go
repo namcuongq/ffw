@@ -9,7 +9,6 @@ import (
 	"ffw/packet"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -47,19 +46,24 @@ type Sock struct {
 	whileListDomain map[string]string
 }
 
-func New(fakeHost, tunnelServer, whileList, mode, prefix string) (*Sock, error) {
+func New(fakeHost, tunnelServer, whileList, mode, prefix string, ssl bool) (*Sock, error) {
 	var (
 		sock Sock
 	)
 
-	pubKey, err := getPublicKey(tunnelServer, prefix)
+	pubKey, err := getPublicKey(tunnelServer, fakeHost, prefix, ssl)
 	if err != nil {
 		return nil, fmt.Errorf("get public key error: %v", err)
 	}
 
-	t := url.URL{Scheme: "ws", Host: tunnelServer, Path: prefix + constant.DEFAULT_ENDPOINT_FFW}
+	schema := ""
+	if ssl {
+		schema = "s"
+	}
+
+	t := url.URL{Scheme: "ws" + schema, Host: tunnelServer, Path: prefix + constant.DEFAULT_ENDPOINT_FFW}
 	if mode == constant.MODE_HTTP {
-		t = url.URL{Scheme: "http", Host: tunnelServer, Path: prefix + constant.DEFAULT_ENDPOINT_HTTP}
+		t = url.URL{Scheme: "http" + schema, Host: tunnelServer, Path: prefix + constant.DEFAULT_ENDPOINT_HTTP}
 	}
 	sock.TunnelServer.Url = t.String()
 	sock.TunnelServer.Mode = mode
@@ -89,17 +93,26 @@ func New(fakeHost, tunnelServer, whileList, mode, prefix string) (*Sock, error) 
 	return &sock, nil
 }
 
-func getPublicKey(server, prefix string) (key []byte, err error) {
-	resp, err := http.Get("http://" + server + prefix + constant.DEFAULT_ENDPOINT_KEY)
+func getPublicKey(server, host, prefix string, ssl bool) (key []byte, err error) {
+	headers := http.Header{}
+	if len(host) > 0 {
+		headers["Host"] = []string{host}
+	}
+
+	schema := "http://"
+	if ssl {
+		schema = "https://"
+	}
+
+	key, statusCode, err := packet.MakeHTTPRequest(schema+server+prefix+constant.DEFAULT_ENDPOINT_KEY, http.MethodGet, headers, nil)
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("error status code: %v", resp.StatusCode)
+
+	if statusCode != http.StatusOK {
+		err = fmt.Errorf("error status code: %v", statusCode)
 		return
 	}
-	key, err = ioutil.ReadAll(resp.Body)
 	return
 }
 
