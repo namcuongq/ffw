@@ -47,7 +47,7 @@ type Sock struct {
 	whileListDomain map[string]string
 }
 
-func New(fakeHost, tunnelServer, whileList, mode string) (*Sock, error) {
+func New(fakeHost, tunnelServer, whileList, mode, prefix string) (*Sock, error) {
 	var (
 		sock Sock
 	)
@@ -57,9 +57,9 @@ func New(fakeHost, tunnelServer, whileList, mode string) (*Sock, error) {
 		return nil, fmt.Errorf("get public key error: %v", err)
 	}
 
-	t := url.URL{Scheme: "ws", Host: tunnelServer, Path: constant.DEFAULT_ENDPOINT_FFW}
+	t := url.URL{Scheme: "ws", Host: tunnelServer, Path: prefix + constant.DEFAULT_ENDPOINT_FFW}
 	if mode == constant.MODE_HTTP {
-		t = url.URL{Scheme: "http", Host: tunnelServer, Path: constant.DEFAULT_ENDPOINT_HTTP}
+		t = url.URL{Scheme: "http", Host: tunnelServer, Path: prefix + constant.DEFAULT_ENDPOINT_HTTP}
 	}
 	sock.TunnelServer.Url = t.String()
 	sock.TunnelServer.Mode = mode

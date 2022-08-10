@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/fasthttp/websocket"
@@ -69,6 +70,15 @@ var (
 	privKey string
 )
 
+type slashFix struct {
+	mux http.Handler
+}
+
+func (h *slashFix) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	r.URL.Path = strings.Replace(r.URL.Path, "//", "/", -1)
+	h.mux.ServeHTTP(w, r)
+}
+
 func main() {
 	if len(privKey) > 0 {
 		var err error
@@ -98,11 +108,13 @@ func main() {
 		}
 	}()
 
-	http.HandleFunc(constant.DEFAULT_ENDPOINT_KEY, func(w http.ResponseWriter, r *http.Request) {
+	httpMux := http.NewServeMux()
+
+	httpMux.HandleFunc(constant.DEFAULT_ENDPOINT_KEY, func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, string(publicKey))
 	})
 
-	http.HandleFunc(constant.DEFAULT_ENDPOINT_HTTP, func(w http.ResponseWriter, r *http.Request) {
+	httpMux.HandleFunc(constant.DEFAULT_ENDPOINT_HTTP, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			id := r.Header.Get("X-Id")
 			if len(id) < 1 {
@@ -210,7 +222,7 @@ func main() {
 		}
 	})
 
-	http.HandleFunc(constant.DEFAULT_ENDPOINT_FFW, func(w http.ResponseWriter, r *http.Request) {
+	httpMux.HandleFunc(constant.DEFAULT_ENDPOINT_FFW, func(w http.ResponseWriter, r *http.Request) {
 		target := r.Header.Get("For")
 		if len(target) < 1 {
 			http.NotFound(w, r)
@@ -252,8 +264,9 @@ func main() {
 		go packet.ForwardWebSocket(remoteConn, currentConn, keyAES)
 		packet.CopyWebSocket(currentConn, remoteConn, keyAES)
 	})
+
 	log.Printf("[http-tunnel %s] Server run on: %s\n", constant.VERSION, addr)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	log.Fatal(http.ListenAndServe(addr, &slashFix{httpMux}))
 }
 
 func init() {

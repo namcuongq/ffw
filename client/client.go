@@ -15,6 +15,7 @@ var (
 	host   string
 	ignore string
 	mode   string
+	prefix string
 )
 
 func main() {
@@ -23,7 +24,7 @@ func main() {
 		return
 	}
 
-	s, err := sock5.New(host, server, ignore, mode)
+	s, err := sock5.New(host, server, ignore, mode, prefix)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -41,5 +42,7 @@ func init() {
 	flag.StringVar(&host, "host", "google.com", "Fake host header to bypass")
 	flag.StringVar(&ignore, "ignore", "", "No proxy for. Example: 127.0.0.1,*.google.com")
 	flag.StringVar(&mode, "mode", "ws", "Tunnel mode 'ws' for websocket OR 'http' for http protocol")
+	flag.StringVar(&prefix, "prefix", "", "Prefix server url")
+
 	flag.Parse()
 }
