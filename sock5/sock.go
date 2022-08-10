@@ -36,6 +36,7 @@ const (
 type Tunnel struct {
 	TCPAddr net.TCPAddr
 	Url     string
+	Mode    string
 }
 
 type Sock struct {
@@ -46,7 +47,7 @@ type Sock struct {
 	whileListDomain map[string]string
 }
 
-func New(fakeHost, tunnelServer, whileList string) (*Sock, error) {
+func New(fakeHost, tunnelServer, whileList, mode string) (*Sock, error) {
 	var (
 		sock Sock
 	)
@@ -57,7 +58,11 @@ func New(fakeHost, tunnelServer, whileList string) (*Sock, error) {
 	}
 
 	t := url.URL{Scheme: "ws", Host: tunnelServer, Path: constant.DEFAULT_ENDPOINT_FFW}
+	if mode == constant.MODE_HTTP {
+		t = url.URL{Scheme: "http", Host: tunnelServer, Path: constant.DEFAULT_ENDPOINT_HTTP}
+	}
 	sock.TunnelServer.Url = t.String()
+	sock.TunnelServer.Mode = mode
 	port, _ := strconv.Atoi(t.Port())
 	sock.TunnelServer.TCPAddr = net.TCPAddr{
 		IP:   net.ParseIP(strings.Replace(t.Host, ":"+t.Port(), "", 1)),
@@ -248,7 +253,39 @@ func (s *Sock) parseTarget(conn net.Conn) (host string, port string, err error) 
 	return
 }
 
-func (s *Sock) proxyPass(conn net.Conn, target string) error {
+func (s *Sock) proxyPassHTTP(conn net.Conn, target string) error {
+	defer conn.Close()
+	keyEn, err := crypto.RsaEncrypt(s.pubKey, s.aesKey)
+	if err != nil {
+		return fmt.Errorf("rsa encrypt key: %v", err)
+	}
+
+	headers := http.Header{
+		"Host":                  []string{s.fakeHost},
+		"ETag":                  []string{base64.URLEncoding.EncodeToString(keyEn)},
+		constant.DEFAULT_HEADER: []string{target},
+		"X-Id":                  []string{uuid.New().String()},
+	}
+
+	//create stream
+	err = packet.CreateTunnel(s.TunnelServer.Url, headers)
+	if err != nil {
+		return fmt.Errorf("dial tunnel: %v", err)
+	}
+
+	tcpAddr := &s.TunnelServer.TCPAddr
+
+	err = s.sendOK(conn, tcpAddr)
+	if err != nil {
+		return fmt.Errorf("send ok: %v", err)
+	}
+
+	// Transfer data
+	go packet.CopyTunnel(s.TunnelServer.Url, headers, conn, s.aesKey)
+	return packet.ForwardTunnel(s.TunnelServer.Url, headers, conn, s.aesKey)
+}
+
+func (s *Sock) proxyPassWebSocket(conn net.Conn, target string) error {
 	defer conn.Close()
 	keyEn, err := crypto.RsaEncrypt(s.pubKey, s.aesKey)
 	if err != nil {
@@ -274,8 +311,8 @@ func (s *Sock) proxyPass(conn net.Conn, target string) error {
 	}
 
 	// Transfer data
-	go packet.Copy(dest, conn, s.aesKey)
-	packet.Forward(conn, dest, s.aesKey)
+	go packet.CopyWebSocket(dest, conn, s.aesKey)
+	packet.ForwardWebSocket(conn, dest, s.aesKey)
 	return nil
 }
 
@@ -351,7 +388,11 @@ func (s *Sock) handleConnection(conn net.Conn) {
 	if s.isWhileList(host) {
 		err = s.proxyPassWhileList(conn, net.JoinHostPort(host, port))
 	} else {
-		err = s.proxyPass(conn, net.JoinHostPort(host, port))
+		if s.TunnelServer.Mode == constant.MODE_HTTP {
+			err = s.proxyPassHTTP(conn, net.JoinHostPort(host, port))
+		} else {
+			err = s.proxyPassWebSocket(conn, net.JoinHostPort(host, port))
+		}
 	}
 
 	if err != nil {

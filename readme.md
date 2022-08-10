@@ -1,4 +1,4 @@
-# Go FFW (F*** Firewall) - HTTP tunnel
+# Go FFW (F*** Firewall) - HTTP tunnel v2.0
 
 Go FFW is a reverse tunnel based on [fasthttp](https://github.com/valyala/fasthttp) and [websocket](https://github.com/fasthttp/websocket). It comes in to play by acting as a middle man in relaying the traffic between your blocked applications using http which is normally not blocked and to the destination server, effectively bypassing the restrictions on firewall.
 

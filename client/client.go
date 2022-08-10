@@ -1,8 +1,10 @@
 package main
 
 import (
+	"ffw/constant"
 	"ffw/sock5"
 	"flag"
+	"fmt"
 	"log"
 	"runtime"
 )
@@ -12,10 +14,16 @@ var (
 	server string
 	host   string
 	ignore string
+	mode   string
 )
 
 func main() {
-	s, err := sock5.New(host, server, ignore)
+	if mode != constant.MODE_HTTP && mode != constant.MODE_WEBSOCKET {
+		fmt.Println("Unknown Mode. Use 'ws' or 'http' ")
+		return
+	}
+
+	s, err := sock5.New(host, server, ignore, mode)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -32,5 +40,6 @@ func init() {
 	flag.StringVar(&server, "server", "127.0.0.1:80", "Upstream HTTP Proxies")
 	flag.StringVar(&host, "host", "google.com", "Fake host header to bypass")
 	flag.StringVar(&ignore, "ignore", "", "No proxy for. Example: 127.0.0.1,*.google.com")
+	flag.StringVar(&mode, "mode", "ws", "Tunnel mode 'ws' for websocket OR 'http' for http protocol")
 	flag.Parse()
 }

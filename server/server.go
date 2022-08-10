@@ -7,11 +7,13 @@ import (
 	"ffw/packet"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/fasthttp/websocket"
 )
@@ -85,9 +87,127 @@ func main() {
 	}
 
 	var upgrader = websocket.Upgrader{}
+	var channelTCP = make(map[string]*packet.ChannelTCPData, 0)
+
+	// clear data old
+	go func() {
+		for k, v := range channelTCP {
+			if time.Now().After(v.Date.Add(15 * time.Minute)) {
+				delete(channelTCP, k)
+			}
+		}
+	}()
 
 	http.HandleFunc(constant.DEFAULT_ENDPOINT_KEY, func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, string(publicKey))
+	})
+
+	http.HandleFunc(constant.DEFAULT_ENDPOINT_HTTP, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			id := r.Header.Get("X-Id")
+			if len(id) < 1 {
+				http.NotFound(w, r)
+				return
+			}
+
+			channelData, found := channelTCP[id]
+			if !found {
+				http.NotFound(w, r)
+				return
+			}
+
+			select {
+			case body := <-channelData.IO:
+				w.Write(body)
+				return
+			case <-time.After(10 * time.Second):
+				w.Write([]byte(""))
+				return
+			}
+		} else if r.Method == http.MethodDelete {
+			id := r.Header.Get("X-Id")
+			if len(id) > 0 {
+				channelData, found := channelTCP[id]
+				if found {
+					channelData.Dst.Close()
+					delete(channelTCP, id)
+				}
+			}
+			w.Write([]byte("OK"))
+			return
+		} else if r.Method == http.MethodPut {
+			id := r.Header.Get("X-Id")
+			if len(id) < 1 {
+				http.NotFound(w, r)
+				return
+			}
+
+			channelData, found := channelTCP[id]
+			if !found {
+				http.NotFound(w, r)
+				return
+			}
+
+			body, err := ioutil.ReadAll(r.Body)
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+
+			packet.ForwardHTTP(channelData, body)
+			w.Write([]byte("OK"))
+			return
+		} else if r.Method == http.MethodPost {
+			target := r.Header.Get("For")
+			if len(target) < 1 {
+				http.NotFound(w, r)
+				return
+			}
+
+			keyStr := r.Header.Get("Etag")
+			if len(keyStr) < 1 {
+				http.NotFound(w, r)
+				return
+			}
+
+			id := r.Header.Get("X-Id")
+			if len(id) < 1 {
+				http.NotFound(w, r)
+				return
+			}
+
+			_, found := channelTCP[id]
+			if found {
+				http.NotFound(w, r)
+				return
+			}
+			var newChannel = &packet.ChannelTCPData{}
+			newChannel.IO = make(chan []byte, 10)
+			newChannel.Date = time.Now()
+
+			ciphertext, err := base64.URLEncoding.DecodeString(keyStr)
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+
+			keyAES, err := crypto.RsaDecrypt(privateKey, ciphertext)
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			newChannel.Key = keyAES
+			remoteConn, err := net.Dial("tcp", target)
+			if err != nil {
+				log.Printf("Error: %s", err.Error())
+				return
+			}
+			newChannel.Dst = remoteConn
+			channelTCP[id] = newChannel
+			go packet.CopyHTTP(channelTCP[id], remoteConn)
+			w.Write([]byte("OK"))
+			return
+		}
 	})
 
 	http.HandleFunc(constant.DEFAULT_ENDPOINT_FFW, func(w http.ResponseWriter, r *http.Request) {
@@ -129,8 +249,8 @@ func main() {
 		}
 		defer remoteConn.Close()
 
-		go packet.Forward(remoteConn, currentConn, keyAES)
-		packet.Copy(currentConn, remoteConn, keyAES)
+		go packet.ForwardWebSocket(remoteConn, currentConn, keyAES)
+		packet.CopyWebSocket(currentConn, remoteConn, keyAES)
 	})
 	log.Printf("[http-tunnel %s] Server run on: %s\n", constant.VERSION, addr)
 	log.Fatal(http.ListenAndServe(addr, nil))
