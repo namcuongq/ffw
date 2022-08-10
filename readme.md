@@ -8,12 +8,14 @@ Features:
 * TCP proxy
 * All data is encrypted
 * Easy to use CLI
+* Support websocket or http request
 
 Common use cases:
 
 * Bypass Blocked Sites
 * Bypass blocked protocols (ssh,ftp,...)
 * Get reverse Shell - Bypass firewall
+* Pivot network
 
 ## How it works
 
@@ -48,7 +50,7 @@ This will run HTTP server on port `80`.
 On client:
 
 ```bash
-$ ffwc --addr 127.0.0.1:1995 --server 127.0.0.1:80 --ignore 127.0.0.1,*.google.com
+$ ffwc --addr 127.0.0.1:1995 --server 127.0.0.1:80 --ignore 127.0.0.1,*.google.com --mode http
 ```
 
 This will run SOCK5 proxy server on port `1995`. Configuring your application to use socks proxy.
