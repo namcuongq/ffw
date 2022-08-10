@@ -52,16 +52,18 @@ func New(fakeHost, tunnelServer, whileList, mode, prefix string) (*Sock, error) 
 		sock Sock
 	)
 
-	pubKey, err := getPublicKey(tunnelServer)
+	pubKey, err := getPublicKey(tunnelServer, prefix)
 	if err != nil {
 		return nil, fmt.Errorf("get public key error: %v", err)
 	}
 
+	fmt.Println(prefix)
 	t := url.URL{Scheme: "ws", Host: tunnelServer, Path: prefix + constant.DEFAULT_ENDPOINT_FFW}
 	if mode == constant.MODE_HTTP {
 		t = url.URL{Scheme: "http", Host: tunnelServer, Path: prefix + constant.DEFAULT_ENDPOINT_HTTP}
 	}
 	sock.TunnelServer.Url = t.String()
+	fmt.Println(t.String())
 	sock.TunnelServer.Mode = mode
 	port, _ := strconv.Atoi(t.Port())
 	sock.TunnelServer.TCPAddr = net.TCPAddr{
@@ -89,8 +91,8 @@ func New(fakeHost, tunnelServer, whileList, mode, prefix string) (*Sock, error) 
 	return &sock, nil
 }
 
-func getPublicKey(server string) (key []byte, err error) {
-	resp, err := http.Get("http://" + server + "/" + constant.DEFAULT_ENDPOINT_KEY)
+func getPublicKey(server, prefix string) (key []byte, err error) {
+	resp, err := http.Get("http://" + server + prefix + constant.DEFAULT_ENDPOINT_KEY)
 	if err != nil {
 		return
 	}
