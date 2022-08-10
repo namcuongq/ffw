@@ -68,8 +68,23 @@ func New(fakeHost, tunnelServer, whileList, mode, prefix string, ssl bool) (*Soc
 	sock.TunnelServer.Url = t.String()
 	sock.TunnelServer.Mode = mode
 	port, _ := strconv.Atoi(t.Port())
+	hostname := strings.Replace(t.Host, ":"+t.Port(), "", 1)
+
+	hostToIP := net.ParseIP(hostname)
+	if hostToIP == nil {
+		ips, err := net.LookupIP(hostname)
+		if err != nil {
+			return nil, fmt.Errorf("lookup %s error %v", hostname, err)
+		}
+
+		for _, ip := range ips {
+			hostToIP = ip
+			break
+		}
+	}
+
 	sock.TunnelServer.TCPAddr = net.TCPAddr{
-		IP:   net.ParseIP(strings.Replace(t.Host, ":"+t.Port(), "", 1)),
+		IP:   hostToIP,
 		Port: port,
 		Zone: "ip4",
 	}
