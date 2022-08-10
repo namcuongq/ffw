@@ -1,9 +1,9 @@
 package constant
 
 const (
-	DEFAULT_ENDPOINT_FFW  = "/ffw"
-	DEFAULT_ENDPOINT_KEY  = "/k"
-	DEFAULT_ENDPOINT_HTTP = "/tunnel"
+	DEFAULT_ENDPOINT_FFW  = "/index"
+	DEFAULT_ENDPOINT_KEY  = "/key"
+	DEFAULT_ENDPOINT_HTTP = "/home"
 
 	MODE_HTTP      = "http"
 	MODE_WEBSOCKET = "ws"
