@@ -3,7 +3,6 @@ package packet
 import (
 	"bytes"
 	"crypto/tls"
-	"ffw/crypto"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,6 +11,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/namcuongq/ffw/crypto"
 
 	"github.com/fasthttp/websocket"
 )

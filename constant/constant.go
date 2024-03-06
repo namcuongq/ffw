@@ -10,5 +10,5 @@ const (
 
 	DEFAULT_HEADER = "For"
 
-	VERSION = "v2.0"
+	VERSION = "v2.1"
 )

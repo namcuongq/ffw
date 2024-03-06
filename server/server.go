@@ -2,9 +2,6 @@ package main
 
 import (
 	"encoding/base64"
-	"ffw/constant"
-	"ffw/crypto"
-	"ffw/packet"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -15,6 +12,10 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/namcuongq/ffw/constant"
+	"github.com/namcuongq/ffw/crypto"
+	"github.com/namcuongq/ffw/packet"
 
 	"github.com/fasthttp/websocket"
 )
@@ -68,6 +69,9 @@ var (
 	addr    string
 	pubKey  string
 	privKey string
+	ssl     bool
+	sslCrt  string
+	sslKey  string
 )
 
 type slashFix struct {
@@ -266,7 +270,11 @@ func main() {
 	})
 
 	log.Printf("[http-tunnel %s] Server run on: %s\n", constant.VERSION, addr)
-	log.Fatal(http.ListenAndServe(addr, &slashFix{httpMux}))
+	if !ssl {
+		log.Fatal(http.ListenAndServe(addr, &slashFix{httpMux}))
+	} else {
+		log.Fatal(http.ListenAndServeTLS(addr, sslCrt, sslKey, &slashFix{httpMux}))
+	}
 }
 
 func init() {
@@ -274,5 +282,8 @@ func init() {
 	flag.StringVar(&addr, "addr", "127.0.0.1:80", "Listening HTTP IP and Port address (ip:port)")
 	flag.StringVar(&pubKey, "pub", "", "Path to public key")
 	flag.StringVar(&privKey, "priv", "", "Path to private key")
+	flag.BoolVar(&ssl, "ssl", false, "enable https")
+	flag.StringVar(&sslKey, "ssl-key", "server.key", "ssl private key (require SSL='true')")
+	flag.StringVar(&sslCrt, "ssl-crt", "server.crt", "ssl public key (require SSL='true')")
 	flag.Parse()
 }

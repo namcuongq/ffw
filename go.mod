@@ -1,4 +1,4 @@
-module ffw
+module github.com/namcuongq/ffw
 
 go 1.16
 

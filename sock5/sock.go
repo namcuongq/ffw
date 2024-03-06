@@ -1,12 +1,10 @@
 package sock5
 
 import (
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
-	"ffw/constant"
-	"ffw/crypto"
-	"ffw/packet"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +13,10 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/namcuongq/ffw/constant"
+	"github.com/namcuongq/ffw/crypto"
+	"github.com/namcuongq/ffw/packet"
 
 	"github.com/fasthttp/websocket"
 	"github.com/google/uuid"
@@ -319,8 +321,10 @@ func (s *Sock) proxyPassWebSocket(conn net.Conn, target string) error {
 	if err != nil {
 		return fmt.Errorf("rsa encrypt key: %v", err)
 	}
-
-	dest, _, err := websocket.DefaultDialer.Dial(s.TunnelServer.Url, http.Header{
+	dialer := websocket.DefaultDialer
+	dialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	dest, _, err := dialer.Dial(s.TunnelServer.Url, http.Header{
+		"User-Agent":            []string{"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0"},
 		"Host":                  []string{s.fakeHost},
 		"ETag":                  []string{base64.URLEncoding.EncodeToString(keyEn)},
 		constant.DEFAULT_HEADER: []string{target},
@@ -409,7 +413,7 @@ func (s *Sock) handleConnection(conn net.Conn) {
 	}
 	host, port, err := s.parseTarget(conn)
 	if err != nil {
-		log.Println("socks consult transfer mode or parse target:", err)
+		// log.Println("socks consult transfer mode or parse target:", err)
 		return
 	}
 
